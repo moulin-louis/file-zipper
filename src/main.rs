@@ -1,15 +1,40 @@
 use id_tree::InsertBehavior::*;
 use id_tree::*;
+use std::collections::BinaryHeap;
 use std::fmt::Debug;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Pair {
     key: String,
-    val: u32,
+    cost: u32,
 }
 
-fn sort_value_occurence(occurence: &mut Vec<Pair>) {
-    occurence.sort_by(|a, b| a.val.cmp(&b.val));
+impl Ord for Pair {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        //Call reverse to implement a min-heap instead of an max-heap
+        other.cost.cmp(&self.cost).reverse()
+    }
+
+    fn max(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        std::cmp::max_by(self, other, Ord::cmp)
+    }
+
+    fn min(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        std::cmp::min_by(self, other, Ord::cmp)
+    }
+}
+
+impl PartialOrd for Pair {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        //Call reverse to implement a min-heap instead of an max-heap
+        Some(self.cmp(other).reverse())
+    }
 }
 
 fn tree_find<'a>(tree: &'a Tree<Pair>, key: &String) -> Option<&'a Node<Pair>> {
@@ -24,44 +49,49 @@ fn tree_find<'a>(tree: &'a Tree<Pair>, key: &String) -> Option<&'a Node<Pair>> {
     return None;
 }
 
-fn build_up_tree<'a>(tree: &'a mut Tree<Pair>, occurence: &'a mut Vec<Pair>) -> &'a Tree<Pair> {
+fn build_up_tree<'a>(
+    tree: &'a mut Tree<Pair>,
+    occurence: &'a mut BinaryHeap<Pair>,
+) -> &'a Tree<Pair> {
     if occurence.len() == 1 {
         return tree;
     }
-    let pair: Vec<Pair> = occurence.drain(0..2).collect();
+    let first_val = occurence.pop().unwrap();
+    println!("first val = {:?}", first_val);
+    let second_val = occurence.pop().unwrap();
     let new_pair = Pair {
-        key: pair[0].key.clone() + &pair[1].key,
-        val: pair[0].val + pair[1].val,
+        key: first_val.key.clone() + &second_val.key,
+        cost: first_val.cost + second_val.cost,
     };
     let root_id = tree.root_node_id().unwrap();
     let new_node = Node::new(new_pair.clone());
     let node = tree_find(tree, &new_pair.key);
-    match node {
-        Some(node) => {
-            let new_id = tree.insert(new_node, UnderNode(&root_id)).unwrap();
-            tree.swap_nodes(&root_id, &new_id, SwapBehavior::LeaveChildren)
-                .unwrap();
-        }
-        None => {}
-    };
-    tree.insert(
-        Node::new(Pair {
-            key: pair[0].key.clone(),
-            val: pair[0].val,
-        }),
-        UnderNode(&root_id),
-    )
-    .unwrap();
-    tree.insert(
-        Node::new(Pair {
-            key: pair[1].key.clone(),
-            val: pair[1].val,
-        }),
-        UnderNode(&root_id),
-    )
-    .unwrap();
+    //match node {
+    //    Some(node) => {
+    //        let new_id = tree.insert(new_node, UnderNode(&root_id)).unwrap();
+    //        tree.swap_nodes(&root_id, &new_id, SwapBehavior::LeaveChildren)
+    //            .unwrap();
+    //    }
+    //    None => {}
+    //};
+    //tree.insert(
+    //    Node::new(Pair {
+    //        key: pair[0].key.clone(),
+    //        val: pair[0].val,
+    //    }),
+    //    UnderNode(&root_id),
+    //)
+    //.unwrap();
+    //tree.insert(
+    //    Node::new(Pair {
+    //        key: pair[1].key.clone(),
+    //        val: pair[1].val,
+    //    }),
+    //    UnderNode(&root_id),
+    //)
+    //.unwrap();
     occurence.push(new_pair);
-    sort_value_occurence(occurence);
+    //sort_value_occurence(occurence);
     build_up_tree(tree, occurence)
 }
 
@@ -71,19 +101,19 @@ fn main() {
     for it in string_test.chars() {
         match occurence.iter_mut().find(|x| x.key == it.to_string()) {
             Some(x) => {
-                x.val += 1;
+                x.cost += 1;
             }
             None => {
                 occurence.push(Pair {
                     key: it.to_string(),
-                    val: 1,
+                    cost: 1,
                 });
             }
         }
     }
-    sort_value_occurence(&mut occurence);
-    let mut tree: Tree<Pair> = TreeBuilder::new().with_node_capacity(5).build();
-    build_up_tree(&mut tree, &mut occurence);
+    let mut b_heap: BinaryHeap<Pair> = BinaryHeap::from(occurence);
+    let mut tree: Tree<Pair> = TreeBuilder::new().with_node_capacity(b_heap.len()).build();
+    //build_up_tree(&mut tree, &mut b_heap);
     let root_id = tree.root_node_id().unwrap();
     println!(
         "root: nbr of children = {}",
