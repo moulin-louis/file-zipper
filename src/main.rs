@@ -1,4 +1,3 @@
-use id_tree::InsertBehavior::*;
 use id_tree::*;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
